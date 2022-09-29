@@ -1,4 +1,4 @@
-# Polymer Named Entity Normalization
+# Polymer Information Extraction
 
 This repo contains code for the paper 'A general purpose material property extraction
 pipeline from large polymer corpora using Natural Language Processing'[[1]](http://arxiv.org/abs/2209.13136).
