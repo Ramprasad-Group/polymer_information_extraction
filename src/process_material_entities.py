@@ -1,16 +1,13 @@
-# Process all material entities identified in text
+"""Process all material entities identified in text"""
 from base_classes import RecordProcessor, MaterialMention, EntityList
 from itertools import combinations
 import Levenshtein
 
-import debugpy
-
 import re
 
-from collections import namedtuple
 
 class ProcessMaterialEntities(RecordProcessor):
-    def __init__(self, grouped_spans, text, material_mentions, abbreviation_pairs, normalization_dataset, test_dataset=None, logger=None):
+    def __init__(self, grouped_spans, text, material_mentions, abbreviation_pairs, normalization_dataset, logger=None):
         """
         Calls all the submodules in order process material_mentions and return a processed version of it
         parameters
@@ -33,11 +30,9 @@ class ProcessMaterialEntities(RecordProcessor):
         self.material_mentions = material_mentions
         self.abbreviation_pairs = abbreviation_pairs
         self.normalization_dataset = normalization_dataset
-        self.test_dataset = test_dataset
         self.logger = logger
         self.solvents = ['NMP', 'DMAc', 'toluene', 'DMF', 'N-methyl-2-pyrrolidone', 'dimethylformamide', 'dimethyl formamide', 'dimethylacetamide', 'dimethyl acetamide', 'm-xylene']
         self.material_categories = ['composite', 'additive', 'plasticiz', 'quaterni', 'crosslink', 'cross-link', 'graft', 'doping', 'doped', 'dopant', 'hydrogel', 'oligomer', 'star', 'filler', 'initia', 'catalys', 'inhib', 'oxidiz', 'solven', 'ligan']
-        # self.copolymer_indicator = ['g-', 'g‐','co‐', 'co-','(co)', 'copoly', 'blend', ':', '/','+', 'graft','saturated', 'b-','b‐', 'star-', '-stat-','stat‐', 'block', 'ipn-', '-ran', 'polymer', 'and ', 'contain', 'sulfonated', 'fluorinate','brominate','chlorinate','isotactic','syndiotactic', '–', 'based','bases', 'membrane','glassy','hyperbranch','aromatic', 'anion', 'gel', 'oligo', 'terminated', 'ii', 'standard']
         self.copolymer_indicator = ['g-', 'g‐','co‐', 'co-','(co)', 'copoly','b-','b‐', 'star-', '-stat-','stat‐', 'block', 'ipn-', '-ran']
 
     def coreference_material_entities(self):
@@ -45,15 +40,8 @@ class ProcessMaterialEntities(RecordProcessor):
         # Normalize material entities found close together. Remove the latter and add as a coreferent
 
         # Normalize if abbreviations found together
-        # delete_index = self.material_mentions.abbreviation_coreference(self.abbreviation_pairs)
         delete_index = set()
-        # for i, entity in enumerate(self.material_mentions.entity_list):
-        #     entity_name = entity.entity_name
-        #     for abbr in self.abbreviation_pairs:
-        #         if abbr[1] == entity_name:
-        #             entity.coreferents.append(abbr[0])
-        #         elif abbr[0] == entity_name:
-        #             delete_index.add(i)
+        
         for abbr in self.abbreviation_pairs:
             for material_entity1, material_entity2 in combinations(self.material_mentions.entity_list, 2):
                 material_index_1 = self.material_mentions.entity_list.index(material_entity1)
@@ -67,7 +55,6 @@ class ProcessMaterialEntities(RecordProcessor):
         # Normalize if polymer entity found adjacent to another
 
         # Keep the lower case version and add coreferents
-        # print('done')
         self.material_mentions.delete_entries(delete_index)
         delete_index = set()
 
@@ -86,7 +73,6 @@ class ProcessMaterialEntities(RecordProcessor):
         for material_entity1, material_entity2 in combinations(self.material_mentions.entity_list, 2):
             material_index_1 = self.material_mentions.entity_list.index(material_entity1)
             material_index_2 = self.material_mentions.entity_list.index(material_entity2)
-            # print('done')
             if material_entity2.entity_name in material_entity1.entity_name and \
                material_entity1.polymer_type != 'copolymer' and \
                not self.coreference_exception(material_entity2.entity_name, material_entity1.entity_name) and \
@@ -102,12 +88,10 @@ class ProcessMaterialEntities(RecordProcessor):
         
         # Find abbreviations not detected by ChemDataExtractor by looking for adjacent tokens with same label with abbreviation
         # Upper bounded in length or preceded by a left bracket token
-        # delete_index = self.material_mentions.proximity_coreference(self.grouped_spans, self.material_entities, delete_index)
         self.material_mentions.delete_entries(delete_index)
         delete_index = set()
         span_length = len(self.grouped_spans)
         i=0
-        # print('done')
         while i < span_length:
             current_label = self.grouped_spans[i].label
             if current_label in self.material_entities:
@@ -130,8 +114,6 @@ class ProcessMaterialEntities(RecordProcessor):
                                 break
 
                         for l, entity in enumerate(self.material_mentions.entity_list):
-                            # if entity.entity_name == self.grouped_spans[i].text:
-                            #     delete_index.add(k)
                             if entity.entity_name == current_entity_name and coreferenced_entity and coreferenced_entity.entity_name not in entity.coreferents:
                                 entity.coreferents.extend(coreferenced_entity.coreferents)
                                 break
@@ -181,7 +163,6 @@ class ProcessMaterialEntities(RecordProcessor):
     
     def detect_material_role(self, sentence, labels):
         # Check for materials which have singleton roles like crosslinkers and grafts
-        # TODO: Modify to ensure the search starts from the relevant term and not the material entity
         # covered_tokens = []
         for i, span in enumerate(sentence):
                 if any([category in span.text for category in self.material_categories]):
@@ -191,13 +172,11 @@ class ProcessMaterialEntities(RecordProcessor):
                             for material_entity in self.material_mentions.entity_list:
                                 if sentence[i+j].text in material_entity.coreferents:
                                     material_entity.role = span.text
-                                    # covered_tokens.append(sentence[i+j].text)
                             break
                         elif i-j>=0 and sentence[i-j].label in ['ORGANIC', 'INORGANIC', 'POLYMER']:
                             for material_entity in self.material_mentions.entity_list:
                                 if sentence[i-j].text in material_entity.coreferents:
                                     material_entity.role = span.text
-                                    # covered_tokens.append(sentence[i-j].text)
                             break
                         j+=1
 
@@ -223,24 +202,7 @@ class ProcessMaterialEntities(RecordProcessor):
                     if any([coreferent in values["coreferents"] or coreferent[0].upper()+coreferent[1:] in values["coreferents"] or coreferent[0].lower()+coreferent[1:] in values["coreferents"] or coreferent.lower() in values['coreferents'] or coreferent.upper() in values['coreferents'] for coreferent in material_entity.coreferents]):
                         material_entity.normalized_material_name = common_polymer_name # Use IUPAC_structure based name for normalization if possible
                         break
-                    # elif :
-                    #     material_entity.normalized_material_name = common_polymer_name # Use IUPAC_structure based name for normalization if possible
-                    #     break
-                else:
-                    # log this value through an externally passed log
-                    # Check if it is in test collection before logging it
-                    if self.test_dataset:
-                        for key, poly_list in self.test_dataset.items():
-                            if material_name in poly_list:
-                                break
-                            # Lower case the first character of a string and compare against poly_list
-                            elif material_name[0].lower()+material_name[1:] in poly_list:
-                                break
-                        else:
-                            if self.logger: self.logger.warning(f'{material_name} not in PNE list')
-                            else: print(f'{material_name} not in PNE list')
-                    # Send this somewhere else to check if should be added to existing dataset or added to new papers
-
+            
     def detect_blend_constituents(self, sentence, labels):
         """Check if the text has keywords that would tell us whether a blend or composite is being referred to"""
         blend_terms = ['blend']
@@ -283,7 +245,6 @@ class ProcessMaterialEntities(RecordProcessor):
                 copolymer_dict.material_class = 'copolymer'
                 delete_index = set()
                 j=i+1
-                # doing a one sided search but 2 sided search might be appropriate
                 while j<len(sentence):
                     if sentence[j].label in ['POLYMER', 'ORGANIC']:
                         for k, material_entity in enumerate(self.material_mentions.entity_list):
@@ -300,7 +261,6 @@ class ProcessMaterialEntities(RecordProcessor):
     def final_material_processing(self):
         self.monomers = EntityList()
         self.polymer_family = EntityList()
-        # self.solvents = []
         delete_index = set()
         for k, material_entity in enumerate(self.material_mentions.entity_list):
             # Remove monomers and separate into a separate list

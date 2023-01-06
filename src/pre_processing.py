@@ -1,4 +1,4 @@
-# Contains pre processing code to merge input tokens and parse material mentions while parsing the text
+"""Contains pre processing code to merge input tokens and parse material mentions while parsing the text"""
 
 import utils
 from base_classes import MaterialMention, RecordProcessor, EntityList, PropertyMention, GROUPED_SPAN_COLUMNS
@@ -31,7 +31,6 @@ class GroupTokens(RecordProcessor):
         # Output grouped token format includes information on start and end of original tokens - Useful for computing performance metrics
         token_label = namedtuple('token_label', GROUPED_SPAN_COLUMNS)
         i = 0
-        # current_label = self.spans[i].label
         material_names = []
         property_names = []
         material_mentions = EntityList()
@@ -48,10 +47,8 @@ class GroupTokens(RecordProcessor):
                 i+=1
                 while next_label == current_label and i < span_length:
                     cumulative_token.append(self.spans[i].text)
-                    # print(i)
                     if i < span_length-1: next_label = self.spans[i+1].label
                     i+=1
-                # end = i-1
                 token_end = i-1+offset
                 joined_token = utils.token_post_processing(' '.join(cumulative_token)) # This will create a case in some cases where there is not a space as an artifice or tokenization as 1.80% will become 1.80 %
                 # Check for abbreviations and handle coreferencing
@@ -79,7 +76,7 @@ class GroupTokens(RecordProcessor):
                                 else:
                                     material_names.append(token)
                                     material_mentions.entity_list.append(MaterialMention(entity_name=token, material_class=mat_label, coreferents=[token]))
-                                    grouped_spans.append(token_label(token, filtered_label, token_start+j, token_start+j))
+                                    grouped_spans.append(token_label(token, current_label, token_start+j, token_start+j))
                         offset+=len(token_list)-1
             
                     else:
@@ -88,8 +85,8 @@ class GroupTokens(RecordProcessor):
                         else:
                             material_names.append(joined_token)
                             # Initialize one material record from base class
-                            material_mentions.entity_list.append(MaterialMention(entity_name=joined_token, material_class=filtered_label, coreferents=[joined_token]))
-                            grouped_spans.append(token_label(joined_token, filtered_label, token_start, token_end))
+                            material_mentions.entity_list.append(MaterialMention(entity_name=joined_token, material_class=current_label, coreferents=[joined_token]))
+                            grouped_spans.append(token_label(joined_token, current_label, token_start, token_end))
                 
                 elif current_label=='PROP_NAME' and joined_token not in property_names:
                     property_names.append(joined_token)

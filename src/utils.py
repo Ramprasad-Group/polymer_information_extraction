@@ -19,7 +19,6 @@ def date_conversion(doc):
     day_count = sum([month_dict[key] for key in range(1, month)])
     assert day_count<=365
     year_fraction = (day_count+day)/365
-    # print(year+year_fraction)
     return year+year_fraction
 
 def property_token_postprocessing(prop_name):
@@ -48,16 +47,13 @@ def process_sentence(grouped_spans, callback, sentence_limit=None):
                 current_sentence.append(grouped_spans[i])
                 labels.append(grouped_spans[i].label) # Might remove
                 i+=1
-                # if i < len_span: current_token = grouped_spans[i].text
             callback(current_sentence, labels)
             # This condition takes care of cases when consecutive periods occur in a sentence
-            # The while loop above prevents i from being incremented and we are hence stuck in an infinite loop
             if current_token == '.' and i < len_span and grouped_spans[i].text == '.':
                 i+=1
             if sentence_limit and sentence_num>sentence_limit:
                 break
             sentence_num+=1
-            # i+=1
             # Process the sentence to extract propery value pairs
 
 def ner_feed(seq_pred, text):
@@ -80,7 +76,6 @@ def ner_feed(seq_pred, text):
         char_index = -1
         while i < len_doc:
             token = doc[i].text
-    #         print(start_index, char_index)
             if char_index+1>=start_index and seq_index<seq_len:
                 # Continue loop till end_index or end of word
                 # increment index and values
@@ -104,23 +99,16 @@ def ner_feed(seq_pred, text):
         return token_labels 
 
 class LoadNormalizationDataset:
-    def __init__(self, curated_normalized_data=None, test_normalized_data=None):
+    def __init__(self, curated_normalized_data=None):
         if curated_normalized_data is None:
             self.curated_normalized_data = ''
         else:
             self.curated_normalized_data = curated_normalized_data
-        if test_normalized_data is None:
-            self.test_normalized_data = ''
-        else:
-            self.test_normalized_data = test_normalized_data
 
     def process_normalization_files(self):
-        """Read the json files associated with train and test for normalization and return them"""
+        """Read the json files associated with normalization and return them"""
         with open(self.curated_normalized_data, 'r') as fi:
             train_data_text = fi.read()
-        with open(self.test_normalized_data, 'r') as fi:
-            test_data_text = fi.read()
         train_data = json.loads(train_data_text)
-        test_data = json.loads(test_data_text)
 
-        return train_data, test_data
+        return train_data

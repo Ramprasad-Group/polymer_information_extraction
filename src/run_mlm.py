@@ -31,7 +31,6 @@ from transformers.utils.versions import require_version
 
 import wandb
 
-import debugpy
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.17.0.dev0")
@@ -538,7 +537,4 @@ def _mp_fn(index):
 
 
 if __name__ == "__main__":
-    # debugpy.listen(5678)
-    # debugpy.wait_for_client()
-    # debugpy.breakpoint()
     main()

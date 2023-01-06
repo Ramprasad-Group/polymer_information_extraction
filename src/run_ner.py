@@ -3,7 +3,6 @@
 
 import logging
 import os
-# from re import sub
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
@@ -331,6 +330,7 @@ def main():
     config = AutoConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         num_labels=num_labels,
+        classifier_dropout=0.2, # Hardcoded dropout for now, use input argument later
         finetuning_task=data_args.task_name,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,

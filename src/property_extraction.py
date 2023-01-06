@@ -1,7 +1,6 @@
-# Extract property value pairs and post process them to obtain a single property record
+""" Extract property value pairs and post process them to obtain a single property record """
 from record_extraction.base_classes import EntityList, PropertyValuePair, RecordProcessor
 from collections import Counter, deque
-import debugpy
 import itertools
 import re
 import json
@@ -34,7 +33,7 @@ class PropertyExtractor(RecordProcessor):
         self.property_value_descriptor_list = ['<', '>', '~', '=', 'and', '≈', 'to', '-']
         self.property_mentions = property_mentions
         self.property_value_pairs = EntityList()
-        property_metadata_file = ''
+        property_metadata_file = '' # Metadata file that contains relevant information about each property such as units and coreferents
         with open(property_metadata_file, 'r', encoding='utf-8') as fi:
             self.prop_records_metadata = json.load(fi)
         self.convert_fraction_to_percentage = [value['property_list'] for key, value in self.prop_records_metadata.items() if value['unit_list'][0]=='%']
@@ -79,9 +78,7 @@ class PropertyExtractor(RecordProcessor):
                                                               property_value=span.text, property_value_start=span.token_start, property_value_end=span.token_end,
                                                               coreferents=self.find_property_coreferents(sentence[j].text))
                                              # No default material name and amount included to be consistent with the previous case
-                            # k=j-1
-                            # mat_name_found = False
-                            # mat_amt_found = False
+
                             material_entities = ['ORGANIC', 'POLYMER', 'INORGANIC', 'POLYMER_FAMILY', 'MONOMER']
                             increment = 1
                             while j+increment<len(sentence) or j-increment>=0:
@@ -130,10 +127,8 @@ class PropertyExtractor(RecordProcessor):
                         property_dict.temperature_condition=temperature_value
                 break
         # Can repeat this for frequency for dielectric constant
-        # print(sentence_str)
         frequency_list = re.findall('\d+ \w?Hz', sentence_str)
         frequency_list+= re.findall('10\^{\d\s?} Hz', sentence_str)
-        # print(frequency_list)
         dielectric_properties = ['dielectric loss', 'dielectric constant', 'relative permittivity']
         for frequency_value in frequency_list:
             # Using exact equal might cause issues. There might be temperature ranges reported for conditions we might miss
@@ -155,7 +150,6 @@ class PropertyExtractor(RecordProcessor):
     def coreference_property_names(self):
         """Combine entities by abbreviation or by case"""
         # Might normalize property values as well later on if required
-        # delete_index = set()
         # Normalize material entities found close together. Remove the latter and add as a coreferent
 
         # Normalize if abbreviations found together
@@ -191,7 +185,6 @@ class PropertyExtractor(RecordProcessor):
                             
             i+=1
         delete_index = []
-        # print(self.property_mentions.entity_list)
         for prop_entity1, prop_entity2 in itertools.combinations(self.property_mentions.entity_list, 2):
             prop_index_1 = self.property_mentions.entity_list.index(prop_entity1)
             prop_index_2 = self.property_mentions.entity_list.index(prop_entity2)
@@ -487,10 +480,5 @@ class PropertyExtractor(RecordProcessor):
     def run(self):
         """Calls all methods in order to process data"""
         self.coreference_property_names()
-        # print(self.property_mentions.entity_list)
         self.process_sentence(self.grouped_spans, self.property_extraction)
         self.property_value_postprocessing()
-
-if __name__ == '__main__':
-    debugpy.listen(5678)
-    debugpy.wait_for_client()

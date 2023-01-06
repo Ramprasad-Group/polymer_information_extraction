@@ -3,7 +3,7 @@ import time
 from chemdataextractor.doc import Paragraph
 
 class RelationExtraction:
-    def __init__(self, text, spans, normalization_dataset, test_dataset, polymer_filter=True, logger=None, verbose=False):
+    def __init__(self, text, spans, normalization_dataset, polymer_filter=True, logger=None, verbose=False):
         """
         Calls all the submodules in order and returns the output from processing a single document
         Parameters
@@ -25,7 +25,6 @@ class RelationExtraction:
         self.text = text
         self.spans = spans
         self.normalization_dataset = normalization_dataset
-        self.test_dataset = test_dataset
         self.polymer_filter = polymer_filter
         self.logger = logger
         self.verbose = verbose
@@ -60,16 +59,13 @@ class RelationExtraction:
                                 break
 
                     elif property_entity.material_name in material_entity.coreferents:
-                        # print(property_entity)
                         material_record['material_name'] = [material_entity.return_dict()]
                         break
-                # property_entity.pop('material_name')
             
                 if property_entity.material_amount:
                     material_record['material_amount'] = {}
                     material_record['material_amount']['entity_name'] = property_entity.material_amount_entity
                     material_record['material_amount']['material_amount'] = property_entity.material_amount
-                    # property_entity.pop('material_amount')
                 material_record['property_record'] = property_entity.return_dict(verbose=self.verbose) # Convert to dictionary and remove the 2 entries
             
             else:
@@ -91,7 +87,7 @@ class RelationExtraction:
             abbreviation_pairs = find_abbreviations(self.text)
             timer['abbreviations']=time.time()-begin
             begin = time.time()
-            self.material_entity_processor = process_material_entities.ProcessMaterialEntities(self.grouped_spans, self.text, material_mentions, abbreviation_pairs, self.normalization_dataset, self.test_dataset, self.logger)
+            self.material_entity_processor = process_material_entities.ProcessMaterialEntities(self.grouped_spans, self.text, material_mentions, abbreviation_pairs, self.normalization_dataset, self.logger)
             self.material_entity_processor.run()
             timer['material_entities']=time.time()-begin
             begin = time.time()

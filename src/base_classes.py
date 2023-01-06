@@ -1,4 +1,4 @@
-# Contains base classes and abstract data types which are inherited by various modules
+"""Contains base classes and abstract data types which are inherited by various modules"""
 
 from dataclasses import dataclass, field
 from typing import List
@@ -40,17 +40,14 @@ class RecordProcessor:
                     # if i < len_span: current_token = grouped_spans[i].text
                 callback(current_sentence, labels)
                 # This condition takes care of cases when consecutive periods occur in a sentence
-                # The while loop above prevents i from being incremented and we are hence stuck in an infinite loop
                 if current_token == '.' and i < len_span and grouped_spans[i].text == '.':
                     i+=1
                 if sentence_limit and sentence_num>sentence_limit:
                     break
                 sentence_num+=1
-                # i+=1
                 # Process the sentence to extract propery value pairs
 
 
-#TODO: Equip with function that returns dictionary representation which can be fed into database
 @dataclass
 class MaterialMention:
     entity_name: str = ''

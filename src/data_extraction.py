@@ -6,15 +6,10 @@ from utils import LoadNormalizationDataset
 from base_classes import GROUPED_SPAN_COLUMNS
 
 import torch
-import sys
 import traceback
-from datetime import datetime
 import argparse
-import debugpy
+import logging
 import time
-import socket
-
-import numpy as np
 
 
 parser = argparse.ArgumentParser()
@@ -81,20 +76,16 @@ parser.add_argument(
 )
 
 class ScaleExtraction:
-    def __init__(self, query, collection_output_name=None, db_local=True, skip_n=0, cap_docs=None, delete_collection=False, check_repeat_doi=False, debug=False, verbose=True, polymer_filter=True):
-        self.dfs_parser = training_file_generation.BertDocCreate()
-        self.db_local = db_local
+    def __init__(self, query, collection_output_name=None, skip_n=0, cap_docs=None, delete_collection=False, check_repeat_doi=False, debug=False, verbose=True, polymer_filter=True):
         self.collection_output_name = collection_output_name
         self.query = query
         self.debug = debug
         self.skip_n = skip_n
         self.verbose = verbose
         self.polymer_filter = polymer_filter
-        # self.doc_refresh_count = 10000
         self.delete_collection = delete_collection
         self.check_repeat_doi = check_repeat_doi
         self.timer = {'abstract_preprocessing': [], 'ner': [], 'relation_extraction': []}
-        self.record_downloader = records_downloader.RecordsDownloader()
         if cap_docs:
             self.cap_docs = int(cap_docs)
         else:
@@ -105,20 +96,14 @@ class ScaleExtraction:
         else:
             self.device = -1
         if not self.debug:
-            logger_file = f''
-            logger_name = 'log_scale_extraction'
-            self.logger = utils.setup_logger(logger_file, logger_name)
+            self.logger = logging.getlogger(__name__)
         else:
             self.logger = None
-        host_device = socket.gethostname()
-        # Model location on Tyrion2
-        if host_device=='tyrion':
-            model_file = ''
+        model_file = '' # Location of BERT encoder model file to load
 
-        # Model location on gaanam4
-        # Load NormalizationDataset
+        # Load NormalizationDataset used to normalize polymer names
         normalization_dataloader = LoadNormalizationDataset()
-        self.train_data, self.test_data = normalization_dataloader.process_normalization_files()
+        self.train_data = normalization_dataloader.process_normalization_files()
 
         tokenizer = AutoTokenizer.from_pretrained(model_file, model_max_length=512)
         model = AutoModelForTokenClassification.from_pretrained(model_file)
@@ -126,12 +111,11 @@ class ScaleExtraction:
         self.ner_pipeline = pipeline(task="ner", model=model, tokenizer=tokenizer, grouped_entities=True, device=self.device)
 
     def setup_connection(self):
-        if self.db_local:
-            self.db = utils.connect_database()
-        else:
-            self.server, self.db = utils.connect_remote_db()
+        """Setup connection to a database that has stored documents. Not implemented here"""
         
-        self.collection_input = utils.pick_collection(self.db, debug=False)
+        self.server = None
+        self.db = None
+        self.collection_input = None
         if self.collection_output_name:
             self.collection_output = self.db[self.collection_output_name]
         
@@ -154,7 +138,6 @@ class ScaleExtraction:
             start_time = time.time()
             self.logger.warning(f'Start time = {start_time}')
         while docs_parsed < num_docs:
-            timer_rel_extraction = {'pre_processing': [], 'abbreviations': [], 'material_entities': [], 'property_values': [], 'material_amount': [], 'link_records': []}
             with cursor:
                 try:
                     for i, doc in enumerate(cursor):
@@ -165,8 +148,7 @@ class ScaleExtraction:
                         output = {}
                         docs_parsed+=1
                         begin = time.time()
-                        abstract = self.dfs_parser.dfs_over_doc('', doc['abstract']) # Create single doc using DFS
-                        abstract = self.dfs_parser.pre_processor.pre_process(abstract)
+                        abstract = doc['abstract']
                         self.timer['abstract_preprocessing'].append(time.time()-begin)
                         # Pre process abstract
                         begin = time.time()
@@ -179,15 +161,12 @@ class ScaleExtraction:
                         if not ner_output: continue
                         record_extraction_input = record_extractor_utils.ner_feed(ner_output, abstract)
                         # Pass logger
-                        # print(record_extraction_input)
-                        relation_extractor = record_extractor.RelationExtraction(text=abstract, spans=record_extraction_input, normalization_dataset=self.train_data, test_dataset=self.test_data, polymer_filter=self.polymer_filter, logger=self.logger, verbose=self.verbose)
+                        relation_extractor = record_extractor.RelationExtraction(text=abstract, spans=record_extraction_input, normalization_dataset=self.train_data, polymer_filter=self.polymer_filter, logger=self.logger, verbose=self.verbose)
                         try:
                             begin = time.time()
-                            output, timer_relation_extraction_one = relation_extractor.process_document()
-                            # if not output: continue
+                            output, _ = relation_extractor.process_document()
                             if output:
                                 self.timer['relation_extraction'].append(time.time()-begin)
-                            # print(output)
                         except Exception as e:
                             if not self.debug:
                                 self.logger.warning(f'Exception {e} occurred for doi {doi} while parsing the input\n')
@@ -196,39 +175,17 @@ class ScaleExtraction:
                                 print(f'Exception {e} occurred for doi {doi} while parsing the input\n')
                                 print(traceback.format_exc())
                                 self.relation_extractor = relation_extractor
-                        # print(i)
-                        # print(docs_parsed)
-                        # print('\n')
                         if docs_parsed%500==0:
                             if self.logger:
                                 self.logger.warning('\n')
                                 self.logger.warning(f'Done with {docs_parsed} documents\n')
                                 self.logger.warning(f'Abstracts with data: {abstracts_with_data} documents\n')
                                 self.logger.warning(f'Positivity ratio: {float(abstracts_with_data/docs_parsed):.2f}\n')
-                                self.logger.warning(f'Average time taken for abstract preprocessing: {np.average(self.timer["abstract_preprocessing"]):.3f} s')
-                                self.logger.warning(f'Average time taken for NER: {np.average(self.timer["ner"]):.3f} s')
-                                self.logger.warning(f'Average time taken for Relation Extraction: {np.average(self.timer["relation_extraction"]):.3f} s\n')
-                                self.logger.warning(f'Average time taken for Relation Extraction pre-processing: {np.average(timer_rel_extraction["pre_processing"]):.3f} s\n')
-                                self.logger.warning(f'Average time taken for Relation Extraction abbreviations: {np.average(timer_rel_extraction["abbreviations"]):.3f} s\n')
-                                self.logger.warning(f'Average time taken for Relation Extraction material entities: {np.average(timer_rel_extraction["material_entities"]):.3f} s\n')
-                                self.logger.warning(f'Average time taken for Relation Extraction property values: {np.average(timer_rel_extraction["property_values"]):.3f} s\n')
-                                self.logger.warning(f'Average time taken for Relation Extraction link records: {np.average(timer_rel_extraction["link_records"]):.3f} s\n')
                             else:
                                 print(f'\nDone with {docs_parsed} documents\n')
 
                         # Log some metrics when applying model at scale
                         if output:
-                            if doc.get('month') is None and doc.get('day') is None:
-                                metadata_record = self.record_downloader.get_metadata_from_doi(doi)
-                                if metadata_record: # Will be false if the document belongs to a blocked metadata type
-                                    self.collection_input.update_one({'_id': doc.get('_id')}, {'$set': {'year': metadata_record['year'], 'month': metadata_record['month'], 'day': metadata_record['day'], 'citations': metadata_record['citations'],
-                                                                            }})
-                                    doc['month'] = metadata_record['month']
-                                    doc['year'] = metadata_record['year']
-                                    doc['day'] = metadata_record['day']
-
-                            for key in timer_rel_extraction:
-                                timer_rel_extraction[key].append(timer_relation_extraction_one[key])
                             abstracts_with_data+=1
                             output['DOI'] = doi
                             output['title'] = doc.get('title')
@@ -253,7 +210,6 @@ class ScaleExtraction:
                         self.logger.exception(e)
                     else:
                         print(f'Exception {e} occurred for doi {doi} in outer loop\n')
-                    # break
         
             if hasattr(self, 'server'): self.server.stop()
 
@@ -277,14 +233,9 @@ def named_tuple_to_dict(named_tuple):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    if args.use_debugpy:
-        debugpy.listen(5678)
-        debugpy.wait_for_client()
-        debugpy.breakpoint()
     if args.polymer_filter:
         query = {'abstract': {'$regex': 'poly', '$options': 'i'}}
     else:
         query = {'$and': [{'abstract': {'$not': {'$regex': 'poly', '$options': 'i'}}}, {'abstract': {'$exists': True}}, {'abstract': {'$ne': None}}]}
     scale_extractor = ScaleExtraction(query = query, collection_output_name=args.collection_output_name, db_local=args.db_local, skip_n = args.skip_n, cap_docs=args.cap_docs, delete_collection=args.delete_collection, check_repeat_doi=args.check_repeat_doi, debug=False, verbose=args.verbose, polymer_filter=args.polymer_filter)
     scale_extractor.scale_data_collection()
-    utils.code_termination(sys.argv[0])
