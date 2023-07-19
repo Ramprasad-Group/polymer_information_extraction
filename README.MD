@@ -28,6 +28,10 @@ python run_mlm.py \
 
 Use python data_extraction.py to combine NER predictions using heuristic rules.
 
+The NER model used for sequence labeling can be found [here](https://huggingface.co/pranav-s/PolymerNER)
+
+The MaterialsBERT language model that is used as the encoder for the above NER model can be found [here](https://huggingface.co/pranav-s/MaterialsBERT)
+
 Please cite our paper if you use the code or data in this repo
 
 ```latex
