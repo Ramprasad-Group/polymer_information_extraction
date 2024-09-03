@@ -1,5 +1,7 @@
 # Polymer Information Extraction
 
+# IMPORTANT NOTE: The code and data shared here is available for academic non-commercial use only
+
 This repo contains code for the paper 'A general purpose material property extraction
 pipeline from large polymer corpora using natural language processing'[[1]](https://www.nature.com/articles/s41524-023-01003-w).
 
